@@ -648,6 +648,14 @@ function renderSections(){
     };
     tab.appendChild(name);
     if (sec.id === activeSectionId){
+      const ren = el('span', 'sx', '✎');
+      ren.title = 'Renombrar sección';
+      ren.onclick = (e) => {
+        e.stopPropagation();
+        const nn = prompt('Nombre de la sección:', sec.name);
+        if (nn){ sec.name = nn.trim() || sec.name; renderSections(); renderArrangement(); save(); }
+      };
+      tab.appendChild(ren);
       const dup = el('span', 'sx', '⧉');
       dup.title = 'Duplicar sección';
       dup.onclick = (e) => { e.stopPropagation(); duplicateSection(sec); };
@@ -680,16 +688,36 @@ function duplicateSection(sec){
   renderSections(); renderArrangement(); renderWorkspace(); renderProgLane(); save();
 }
 
-function addSection(){
+function addSection(name){
+  // si ya existe una sección con ese nombre, numera la nueva: «Estrofa 2»
   const used = new Set(state.sections.map(s => s.name));
-  const name = SECTION_NAMES.find(n => !used.has(n)) ?? ('Sección ' + (state.sections.length + 1));
-  const sec = newSection(name, activeSection().bars);
+  let final = name, n = 2;
+  while (used.has(final)) final = name + ' ' + n++;
+  const sec = newSection(final, activeSection().bars);
   sec.drums.style = activeSection().drums.style;
   state.sections.push(sec);
   state.arrangement.push(sec.id);
   activeSectionId = sec.id;
   $('#bars').value = sec.bars;
   renderSections(); renderArrangement(); renderWorkspace(); renderProgLane(); save();
+}
+
+// menú del botón «＋ Sección»: nombres típicos + personalizado
+function renderSectionMenu(){
+  const menu = $('#sectionMenu');
+  menu.innerHTML = '';
+  for (const name of SECTION_NAMES){
+    const b = el('button', '', name);
+    b.onclick = () => { menu.classList.add('hidden'); addSection(name); };
+    menu.appendChild(b);
+  }
+  const custom = el('button', 'custom-name', '✏ Otro nombre…');
+  custom.onclick = () => {
+    menu.classList.add('hidden');
+    const nn = prompt('Nombre de la nueva sección:');
+    if (nn && nn.trim()) addSection(nn.trim());
+  };
+  menu.appendChild(custom);
 }
 
 function renderArrangement(){
@@ -1769,7 +1797,15 @@ function bindControls(){
   $('#btnNewSong').onclick = () => { newSong(); $('#songsModal').classList.add('hidden'); };
   $('#songsModal').onclick = (e) => { if (e.target === $('#songsModal')) $('#songsModal').classList.add('hidden'); };
 
-  $('#btnAddSection').onclick = addSection;
+  $('#btnAddSection').onclick = (e) => {
+    e.stopPropagation();
+    const menu = $('#sectionMenu');
+    if (menu.classList.contains('hidden')){ renderSectionMenu(); menu.classList.remove('hidden'); }
+    else menu.classList.add('hidden');
+  };
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.add-wrap')) $('#sectionMenu').classList.add('hidden');
+  });
 
   $('#btnAddTrack').onclick = () => {
     const tr = { id: uid(), name: 'Línea ' + (state.tracks.length + 1), instrument: 'piano', volume: 0.9, mute: false };
