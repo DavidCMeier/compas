@@ -744,25 +744,95 @@ function renderMelodicRows(roll, total){
 
     const lane = el('div', 'row-lane');
     lane.style.width = (total * CELL()) + 'px';
-    lane.onclick = (e) => {
-      const step = Math.floor(e.offsetX / CELL());
-      if (step < 0 || step >= total) return;
-      const len = Math.min(defaultNoteLen(), total - step);
-      notes.push({ midi, start: step, len, vel: 0.9 });
-      AudioEngine.playNote(tr.instrument, midi, undefined, len * stepDur(), 0.9);
-      renderRoll(); save();
+
+    // crear nota: clic coloca con la duración del selector;
+    // con el ratón, arrastrar en horizontal elige la duración sobre la marcha
+    lane.onpointerdown = (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      const rect = lane.getBoundingClientRect();
+      const startStep = Math.floor((e.clientX - rect.left) / CELL());
+      if (startStep < 0 || startStep >= total) return;
+      const isMouse = e.pointerType === 'mouse';
+      const startX = e.clientX;
+      let dragging = false;
+      let dragLen = null;
+      let ghost = null;
+
+      if (isMouse){
+        try { lane.setPointerCapture(e.pointerId); } catch {}
+        ghost = el('div', 'note-block ghost');
+        ghost.style.left = (startStep * CELL()) + 'px';
+        ghost.style.width = (Math.min(defaultNoteLen(), total - startStep) * CELL() - 2) + 'px';
+        lane.appendChild(ghost);
+      }
+
+      const move = (ev) => {
+        if (!isMouse) return;
+        if (Math.abs(ev.clientX - startX) > 5) dragging = true;
+        if (!dragging) return;
+        const step = Math.floor((ev.clientX - rect.left) / CELL());
+        dragLen = Math.max(1, Math.min(step - startStep + 1, total - startStep));
+        ghost.style.width = (dragLen * CELL() - 2) + 'px';
+      };
+      const finish = (commit) => {
+        lane.removeEventListener('pointermove', move);
+        lane.removeEventListener('pointerup', up);
+        lane.removeEventListener('pointercancel', cancel);
+        if (ghost) ghost.remove();
+        if (!commit) return;
+        const len = (dragging && dragLen) ? dragLen : Math.min(defaultNoteLen(), total - startStep);
+        notes.push({ midi, start: startStep, len, vel: 0.9 });
+        AudioEngine.playNote(tr.instrument, midi, undefined, len * stepDur(), 0.9);
+        renderRoll(); save();
+      };
+      const up = () => finish(true);
+      const cancel = () => finish(false); // en táctil, un scroll cancela sin colocar nota
+      lane.addEventListener('pointermove', move);
+      lane.addEventListener('pointerup', up);
+      lane.addEventListener('pointercancel', cancel);
     };
 
     for (const note of notes.filter(nt => nt.midi === midi)){
       const b = el('div', 'note-block');
       b.style.left = (note.start * CELL()) + 'px';
       b.style.width = (note.len * CELL() - 2) + 'px';
-      b.title = Theory.midiToName(midi, state.key) + ' · clic para borrar';
-      b.onclick = (e) => {
+      b.style.touchAction = 'none';
+      b.title = Theory.midiToName(midi, state.key) + ' · clic = borrar · arrastra = duración';
+
+      // clic suelto borra; arrastrar cambia la duración
+      b.onpointerdown = (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
         e.stopPropagation();
-        const i = notes.indexOf(note);
-        if (i >= 0) notes.splice(i, 1);
-        renderRoll(); save();
+        const rect = lane.getBoundingClientRect();
+        const startX = e.clientX;
+        let dragging = false;
+        try { b.setPointerCapture(e.pointerId); } catch {}
+
+        const move = (ev) => {
+          if (Math.abs(ev.clientX - startX) > 5) dragging = true;
+          if (!dragging) return;
+          const step = Math.floor((ev.clientX - rect.left) / CELL());
+          const newLen = Math.max(1, Math.min(step - note.start + 1, total - note.start));
+          if (newLen !== note.len){
+            note.len = newLen;
+            b.style.width = (newLen * CELL() - 2) + 'px';
+          }
+        };
+        const up = () => {
+          b.removeEventListener('pointermove', move);
+          b.removeEventListener('pointerup', up);
+          b.removeEventListener('pointercancel', up);
+          if (!dragging){
+            const i = notes.indexOf(note);
+            if (i >= 0) notes.splice(i, 1);
+          } else {
+            AudioEngine.playNote(tr.instrument, midi, undefined, note.len * stepDur(), 0.9);
+          }
+          renderRoll(); save();
+        };
+        b.addEventListener('pointermove', move);
+        b.addEventListener('pointerup', up);
+        b.addEventListener('pointercancel', up);
       };
       lane.appendChild(b);
     }

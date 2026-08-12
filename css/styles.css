@@ -332,6 +332,7 @@ input[type=range]{ accent-color:var(--amber); width:90px; }
   cursor:pointer;
 }
 .note-block:hover{ filter:brightness(1.2); }
+.note-block.ghost{ opacity:.45; pointer-events:none; }
 
 .drum-row .note-block{
   background:linear-gradient(180deg, var(--teal), #3a8177);
