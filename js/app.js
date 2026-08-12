@@ -53,6 +53,7 @@ function defaultState(){
     baseOct: 3,
     seventh: false,
     arpMode: 'block',
+    arpStep: 'half',   // duración de cada nota del arpegio: step | half | beat | twobeats
     playMode: 'section',
     drumsMute: false,
     tracks: [
@@ -80,7 +81,9 @@ function migrate(s){
   if (s.version === 2){
     for (const sec of s.sections)
       for (const snd of AudioEngine.DRUM_SOUNDS) sec.drums.steps[snd] ??= [];
-    return { ...defaultState(), ...s };
+    const merged = { ...defaultState(), ...s };
+    if (merged.arpMode === 'pattern') merged.arpMode = 'random'; // el patrón 1·5·3·5 pasó a ser «aleatorio»
+    return merged;
   }
   const base = defaultState();
   const sec = newSection('Estrofa', s.bars ?? 4);
@@ -1086,6 +1089,7 @@ function renderProgLane(){
 // índices de arpegio para un acorde de `len` notas dentro de `count` golpes
 function arpIndices(mode, len, count){
   const out = [];
+  let prev = -1;
   for (let k = 0; k < count; k++){
     switch(mode){
       case 'up':      out.push(k % len); break;
@@ -1096,15 +1100,31 @@ function arpIndices(mode, len, count){
         out.push(p < len ? p : period - p);
         break;
       }
-      case 'pattern': {
-        const seq = [0, len - 1, Math.min(1, len - 1), len - 1];
-        out.push(seq[k % seq.length]);
+      case 'random': {
+        // aleatorio evitando repetir la misma nota dos veces seguidas
+        let idx = Math.floor(Math.random() * len);
+        if (len > 1 && idx === prev) idx = (idx + 1 + Math.floor(Math.random() * (len - 1))) % len;
+        prev = idx;
+        out.push(idx);
         break;
       }
       default: out.push(k % len);
     }
   }
   return out;
+}
+
+// duración (en pasos) de cada nota del arpegio según el selector
+function arpStepSteps(){
+  const spb = stepsPerBeat();
+  const map = { step: 1, half: Math.max(1, Math.floor(spb / 2)), beat: spb, twobeats: spb * 2 };
+  return Math.min(map[state.arpStep] ?? map.half, stepsPerBar());
+}
+
+// la duración de nota solo aplica a los arpegios, no al modo bloque
+function syncArpStepVisibility(){
+  $('#arpStepGroup').style.opacity = state.arpMode === 'block' ? '.35' : '1';
+  $('#arpStep').disabled = state.arpMode === 'block';
 }
 
 function applyProgressionToTrack(){
@@ -1129,8 +1149,8 @@ function applyProgressionToTrack(){
         notes.push({ midi: m, start: barStart, len: spbar, vel: 0.85 });
       }
     } else {
-      const stepLen = Math.max(1, Math.floor(stepsPerBeat() / 2)); // corcheas
-      const count = Math.floor(spbar / stepLen);
+      const stepLen = arpStepSteps();
+      const count = Math.max(1, Math.floor(spbar / stepLen));
       const idxs = arpIndices(mode, tones.length, count);
       // limpia lo que hubiera del mismo acorde en el compás
       const filtered = notes.filter(n => !(tones.includes(n.midi) && overlaps(n, barStart, spbar)));
@@ -1758,7 +1778,8 @@ function bindControls(){
     renderWorkspace(); save();
   };
 
-  $('#arpMode').onchange = e => { state.arpMode = e.target.value; save(); };
+  $('#arpMode').onchange = e => { state.arpMode = e.target.value; syncArpStepVisibility(); save(); };
+  $('#arpStep').onchange = e => { state.arpStep = e.target.value; save(); };
   $('#btnApplyProg').onclick = applyProgressionToTrack;
   $('#btnClearProg').onclick = () => { activeSection().progression = Array(activeSection().bars).fill(null); renderProgLane(); save(); };
 
@@ -1844,6 +1865,8 @@ function renderAll(){
   $('#songTitle').value = state.title;
   $('#lyrics').value = state.lyrics;
   $('#arpMode').value = state.arpMode;
+  $('#arpStep').value = state.arpStep ?? 'half';
+  syncArpStepVisibility();
   if (state.lyrics) $('#lyricsBox').classList.remove('hidden');
   renderRoots();
   renderCircle();

@@ -200,13 +200,22 @@
       <div id="progLane" class="prog-lane"></div>
       <div class="row gap">
         <div class="thgroup">
-          <label class="tiny-label">CÓMO ESCRIBIRLA</label>
+          <label class="tiny-label">PATRÓN</label>
           <select id="arpMode">
             <option value="block">Acordes en bloque</option>
             <option value="up">Arpegio ascendente</option>
             <option value="down">Arpegio descendente</option>
             <option value="updown">Arpegio arriba y abajo</option>
-            <option value="pattern">Patrón 1·5·3·5</option>
+            <option value="random">Arpegio aleatorio</option>
+          </select>
+        </div>
+        <div class="thgroup" id="arpStepGroup">
+          <label class="tiny-label">DURACIÓN DE CADA NOTA</label>
+          <select id="arpStep">
+            <option value="step">Subdivisión (1 paso)</option>
+            <option value="half">Media parte (corchea)</option>
+            <option value="beat">1 parte (pulso)</option>
+            <option value="twobeats">2 partes</option>
           </select>
         </div>
         <button id="btnApplyProg" class="btn-secondary">Escribir en la pista activa</button>
