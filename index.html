@@ -15,7 +15,7 @@
 <header class="topbar">
   <div class="brand">
     <h1>COMPÁS</h1>
-    <span class="tagline">estudio de composición</span>
+    <span class="tagline">estudio de composición <span id="appVersionTop" class="version-tag"></span></span>
   </div>
 
   <div class="transport">
@@ -158,6 +158,7 @@
     <div class="song-title-row">
       <input id="songTitle" class="song-title" value="Mi canción" spellcheck="false">
       <div class="song-actions">
+        <button id="btnSongs" class="mini" title="Ver todas tus canciones">🎵 Mis canciones</button>
         <button id="btnTransDown" class="mini" title="Transponer toda la canción un semitono abajo">−1</button>
         <span class="mini-label">transponer</span>
         <button id="btnTransUp" class="mini" title="Transponer toda la canción un semitono arriba">+1</button>
@@ -234,10 +235,24 @@
     <input type="file" id="fileInput" accept=".json,.mid,.midi" hidden>
   </div>
   <span class="autosave" id="autosaveMsg">Todo se guarda automáticamente en este dispositivo.</span>
+  <span class="autosave" id="appVersionFoot"></span>
 </footer>
 
 <div id="toast" class="toast hidden"></div>
 
+<!-- biblioteca de canciones -->
+<div id="songsModal" class="modal hidden">
+  <div class="modal-box">
+    <h2 class="modal-title">Mis canciones</h2>
+    <div id="songsList" class="songs-list"></div>
+    <div class="row gap">
+      <button id="btnNewSong" class="btn-secondary">＋ Nueva canción</button>
+      <button id="btnCloseSongs" class="mini">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/version.js"></script>
 <script src="js/theory.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/drums.js"></script>

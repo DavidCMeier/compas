@@ -65,6 +65,7 @@ input,select,textarea{ font-family:inherit; color:inherit; }
   font-family:var(--font-mono); font-size:9px; letter-spacing:.28em;
   text-transform:uppercase; color:var(--muted);
 }
+.version-tag{ color:var(--amber-dim); letter-spacing:.1em; }
 .transport{ display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; }
 .tgroup{ display:flex; flex-direction:column; gap:4px; }
 .tgroup label{
@@ -400,6 +401,39 @@ input[type=range]{ accent-color:var(--amber); width:90px; }
 @keyframes toast-in{ from{ opacity:0; transform:translate(-50%, 10px);} }
 
 .hidden{ display:none !important; }
+
+/* ---------- biblioteca de canciones ---------- */
+
+.modal{
+  position:fixed; inset:0; z-index:300;
+  background:rgba(12,9,7,.72); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+.modal-box{
+  background:var(--panel); border:1px solid var(--amber-dim); border-radius:14px;
+  padding:22px; width:min(560px, 100%); max-height:82vh; overflow-y:auto;
+  display:flex; flex-direction:column; gap:16px;
+  box-shadow:0 24px 70px rgba(0,0,0,.6);
+}
+.modal-title{
+  font-family:var(--font-display); font-size:16px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--amber);
+}
+.songs-list{ display:flex; flex-direction:column; gap:8px; }
+.song-row{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:11px 13px; background:var(--bg2);
+  border:1px solid var(--line); border-radius:10px; cursor:pointer;
+  transition:border-color .15s;
+}
+.song-row:hover{ border-color:var(--amber-dim); }
+.song-row.current{ border-color:var(--amber); }
+.song-row .stitle{ font-weight:600; font-size:14px; flex:1; min-width:120px; }
+.song-row .sdate{ font-family:var(--font-mono); font-size:9px; color:var(--muted); }
+.song-row .sbadge{
+  font-family:var(--font-mono); font-size:8px; letter-spacing:.12em;
+  color:var(--bg); background:var(--amber); border-radius:20px; padding:3px 9px;
+}
 
 /* ---------- círculo de quintas ---------- */
 

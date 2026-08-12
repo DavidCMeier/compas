@@ -55,6 +55,7 @@ directamente en la mayoría de navegadores.)
 |---|---|
 | `index.html` | estructura de la interfaz |
 | `css/styles.css` | estética "estudio analógico" |
+| `js/version.js` | número de versión mostrado en la web — súbelo en cada despliegue |
 | `js/theory.js` | notas, escalas, modos, acordes, progresiones |
 | `js/audio.js` | sintetizadores Web Audio (sustractivo, FM, Karplus–Strong, formantes) y batería |
 | `js/drums.js` | generador de patrones de batería por compás y estilo |

@@ -16,7 +16,10 @@ const el = (tag, cls, txt) => {
   return e;
 };
 
-const STORAGE_KEY = 'compas-song-v1';
+const INDEX_KEY = 'compas-songs-index';
+const SONG_PREFIX = 'compas-song-';
+const CURRENT_KEY = 'compas-current';
+const LEGACY_KEY = 'compas-song-v1';
 const DRUMS_ID = '__drums__';
 const SECTION_NAMES = ['Estrofa','Estribillo','Puente','Intro','Final','Solo','Pre-estribillo'];
 
@@ -100,7 +103,52 @@ function migrate(s){
   };
 }
 
-let state = loadState() || defaultState();
+/* ---- biblioteca de canciones ---- */
+
+let songIndex = [];      // [{id, title, updated}]
+let currentSongId = null;
+
+function persistIndex(){
+  try { localStorage.setItem(INDEX_KEY, JSON.stringify(songIndex)); } catch {}
+}
+
+function loadSong(id){
+  try {
+    const raw = localStorage.getItem(SONG_PREFIX + id);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s.tracks) return null;
+    return migrate(s);
+  } catch { return null; }
+}
+
+function loadLibrary(){
+  try { songIndex = JSON.parse(localStorage.getItem(INDEX_KEY)) || []; } catch { songIndex = []; }
+  // migración: el proyecto único de versiones anteriores pasa a ser la primera canción
+  try {
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy){
+      const s = JSON.parse(legacy);
+      const id = uid();
+      localStorage.setItem(SONG_PREFIX + id, legacy);
+      songIndex.unshift({ id, title: s.title ?? 'Mi canción', updated: Date.now() });
+      localStorage.removeItem(LEGACY_KEY);
+      localStorage.setItem(CURRENT_KEY, id);
+      persistIndex();
+    }
+  } catch {}
+  currentSongId = localStorage.getItem(CURRENT_KEY);
+  if (!songIndex.find(e => e.id === currentSongId)) currentSongId = songIndex[0]?.id ?? null;
+  if (!currentSongId){
+    currentSongId = uid();
+    songIndex = [{ id: currentSongId, title: 'Mi canción', updated: Date.now() }];
+    persistIndex();
+  }
+  localStorage.setItem(CURRENT_KEY, currentSongId);
+  return loadSong(currentSongId);
+}
+
+let state = loadLibrary() || defaultState();
 let activeSectionId = state.sections[0].id;
 let activeTrackId = state.tracks[0]?.id ?? DRUMS_ID;
 let insertCursor = 0;
@@ -123,33 +171,138 @@ const secNotes = (trackId) => {
 
 /* ==================== persistencia ==================== */
 
-function loadState(){
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s.tracks) return null;
-    return migrate(s);
-  } catch { return null; }
-}
-
 let saveTimer = null;
 let quotaWarned = false;
+
+function writeSong(){
+  if (!currentSongId) return; // p. ej. justo tras borrar la canción actual
+  localStorage.setItem(SONG_PREFIX + currentSongId, JSON.stringify(state));
+  const entry = songIndex.find(e => e.id === currentSongId);
+  if (entry){ entry.title = state.title; entry.updated = Date.now(); }
+  persistIndex();
+  localStorage.setItem(CURRENT_KEY, currentSongId);
+}
+
 function save(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      writeSong();
       const m = $('#autosaveMsg');
       m.textContent = 'Guardado ✓ ' + new Date().toLocaleTimeString();
       setTimeout(()=> m.textContent = 'Todo se guarda automáticamente en este dispositivo.', 2500);
     } catch {
       if (!quotaWarned){
         quotaWarned = true;
-        toast('⚠ El proyecto no cabe en el almacenamiento local (probablemente por las grabaciones). Expórtalo como .json para no perderlo.');
+        toast('⚠ La canción no cabe en el almacenamiento local (probablemente por las grabaciones). Expórtala como .json para no perderla.');
       }
     }
   }, 350);
+}
+
+// guardado inmediato (antes de cambiar de canción)
+function saveNow(){
+  clearTimeout(saveTimer);
+  try { writeSong(); } catch {}
+}
+
+/* ---- operaciones de la biblioteca ---- */
+
+function resetViewToSong(){
+  activeSectionId = state.sections[0].id;
+  activeTrackId = state.tracks[0]?.id ?? DRUMS_ID;
+  insertCursor = 0;
+  stop();
+  renderAll();
+}
+
+function switchSong(id){
+  if (id === currentSongId) return;
+  saveNow();
+  const s = loadSong(id);
+  if (!s){ toast('No se pudo abrir esa canción.'); return; }
+  state = s;
+  currentSongId = id;
+  localStorage.setItem(CURRENT_KEY, id);
+  resetViewToSong();
+  toast('Abierta «' + state.title + '».');
+}
+
+function newSong(){
+  saveNow();
+  state = defaultState();
+  currentSongId = uid();
+  songIndex.unshift({ id: currentSongId, title: state.title, updated: Date.now() });
+  persistIndex();
+  localStorage.setItem(CURRENT_KEY, currentSongId);
+  resetViewToSong();
+  freshDrumsIfEmpty();
+  toast('Nueva canción creada.');
+}
+
+function duplicateSong(id){
+  saveNow();
+  const raw = localStorage.getItem(SONG_PREFIX + id);
+  if (!raw) return;
+  try {
+    const s = JSON.parse(raw);
+    s.title = (s.title ?? 'Canción') + ' (copia)';
+    const nid = uid();
+    localStorage.setItem(SONG_PREFIX + nid, JSON.stringify(s));
+    songIndex.unshift({ id: nid, title: s.title, updated: Date.now() });
+    persistIndex();
+    renderSongsList();
+    toast('Copia creada: «' + s.title + '».');
+  } catch { toast('No se pudo duplicar.'); }
+}
+
+function deleteSong(id){
+  const entry = songIndex.find(e => e.id === id);
+  if (!entry) return;
+  if (!confirm(`¿Eliminar la canción «${entry.title}»? Esta acción no se puede deshacer.`)) return;
+  localStorage.removeItem(SONG_PREFIX + id);
+  songIndex = songIndex.filter(e => e.id !== id);
+  persistIndex();
+  if (id === currentSongId){
+    currentSongId = null; // evita que un autoguardado resucite la canción borrada
+    if (songIndex.length) switchSong(songIndex[0].id);
+    else newSong();
+  }
+  renderSongsList();
+}
+
+function registerImportedSong(){
+  currentSongId = uid();
+  songIndex.unshift({ id: currentSongId, title: state.title, updated: Date.now() });
+  persistIndex();
+  localStorage.setItem(CURRENT_KEY, currentSongId);
+}
+
+function renderSongsList(){
+  const list = $('#songsList');
+  list.innerHTML = '';
+  const sorted = songIndex.slice().sort((a,b) => (b.updated ?? 0) - (a.updated ?? 0));
+  for (const e of sorted){
+    const row = el('div', 'song-row' + (e.id === currentSongId ? ' current' : ''));
+    const title = el('span', 'stitle', e.title || 'Sin título');
+    row.appendChild(title);
+    row.appendChild(el('span', 'sdate', new Date(e.updated ?? Date.now()).toLocaleDateString() + ' ' +
+      new Date(e.updated ?? Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})));
+    if (e.id === currentSongId) row.appendChild(el('span', 'sbadge', 'ACTUAL'));
+    const dup = el('button', 'mini', '⧉');
+    dup.title = 'Duplicar';
+    dup.onclick = (ev) => { ev.stopPropagation(); duplicateSong(e.id); };
+    row.appendChild(dup);
+    const x = el('button', 'mini', '✕');
+    x.title = 'Eliminar';
+    x.onclick = (ev) => { ev.stopPropagation(); deleteSong(e.id); };
+    row.appendChild(x);
+    row.onclick = () => {
+      switchSong(e.id);
+      $('#songsModal').classList.add('hidden');
+    };
+    list.appendChild(row);
+  }
 }
 
 function toast(msg){
@@ -1396,25 +1549,28 @@ function importFile(file){
         const s = JSON.parse(reader.result);
         if (s.app !== 'compas' && !s.tracks) throw new Error('formato');
         delete s.app;
+        saveNow();
         state = migrate(s);
-        activeSectionId = state.sections[0].id;
-        activeTrackId = state.tracks[0]?.id ?? DRUMS_ID;
-        renderAll(); save();
-        toast('Proyecto importado: «' + state.title + '»');
+        registerImportedSong();
+        resetViewToSong(); save();
+        toast('Importada como canción nueva: «' + state.title + '»');
       } catch { toast('Ese .json no parece un proyecto de Compás.'); }
     };
     reader.readAsText(file);
   } else {
     reader.onload = () => {
-      try { importMidiBuffer(reader.result); }
+      try { importMidiBuffer(reader.result, file.name.replace(/\.(mid|midi)$/i, '')); }
       catch(e){ console.warn(e); toast('No se pudo leer ese MIDI: ' + e.message); }
     };
     reader.readAsArrayBuffer(file);
   }
 }
 
-function importMidiBuffer(buffer){
+function importMidiBuffer(buffer, name){
   const mid = Midi.read(buffer);
+  saveNow();
+  state = defaultState();
+  state.title = name || 'MIDI importado';
   state.tempo = Math.min(260, Math.max(30, mid.tempo));
   state.timeSig = (mid.timeSig.unit === 4 || mid.timeSig.unit === 8) ? mid.timeSig : { beats:4, unit:4 };
 
@@ -1466,10 +1622,9 @@ function importMidiBuffer(buffer){
   state.tracks = newTracks.length ? newTracks : state.tracks;
   state.sections = [sec];
   state.arrangement = [sec.id];
-  activeSectionId = sec.id;
-  activeTrackId = state.tracks[0]?.id ?? DRUMS_ID;
-  renderAll(); save();
-  toast('MIDI importado: ' + newTracks.length + ' línea(s)' + (hasDrums ? ' + batería' : '') + '.');
+  registerImportedSong();
+  resetViewToSong(); save();
+  toast('MIDI importado como canción nueva: ' + newTracks.length + ' línea(s)' + (hasDrums ? ' + batería' : '') + '.');
 }
 
 function invertDrumMap(){
@@ -1589,6 +1744,11 @@ function bindControls(){
 
   $('#songTitle').onchange = e => { state.title = e.target.value || 'Mi canción'; save(); };
 
+  $('#btnSongs').onclick = () => { renderSongsList(); $('#songsModal').classList.remove('hidden'); };
+  $('#btnCloseSongs').onclick = () => $('#songsModal').classList.add('hidden');
+  $('#btnNewSong').onclick = () => { newSong(); $('#songsModal').classList.add('hidden'); };
+  $('#songsModal').onclick = (e) => { if (e.target === $('#songsModal')) $('#songsModal').classList.add('hidden'); };
+
   $('#btnAddSection').onclick = addSection;
 
   $('#btnAddTrack').onclick = () => {
@@ -1629,6 +1789,7 @@ function bindControls(){
       e.preventDefault();
       togglePlay();
     }
+    if (e.code === 'Escape') $('#songsModal').classList.add('hidden');
   });
 }
 
@@ -1670,6 +1831,8 @@ function renderWorkspace(){
 }
 
 function renderAll(){
+  $('#appVersionTop').textContent = 'v' + APP_VERSION.number;
+  $('#appVersionFoot').textContent = 'Compás v' + APP_VERSION.number + ' · ' + APP_VERSION.date;
   $('#tempo').value = state.tempo;
   $('#timeSig').value = state.timeSig.beats + '/' + state.timeSig.unit;
   $('#bars').value = activeSection().bars;
@@ -1696,16 +1859,19 @@ function renderAll(){
   renderWorkspace();
 }
 
+// patrón de batería inicial si la canción está vacía
+function freshDrumsIfEmpty(){
+  const firstSec = state.sections[0];
+  if (!Object.values(firstSec.drums.steps).some(a => a.length) &&
+      Object.values(firstSec.notes).every(a => !a.length)){
+    generateDrums();
+    activeTrackId = state.tracks[0].id;
+    renderWorkspace();
+  }
+}
+
 bindControls();
 renderAll();
-
-// patrón de batería inicial si el proyecto está vacío
-const firstSec = state.sections[0];
-if (!Object.values(firstSec.drums.steps).some(a => a.length) &&
-    Object.values(firstSec.notes).every(a => !a.length)){
-  generateDrums();
-  activeTrackId = state.tracks[0].id;
-  renderWorkspace();
-}
+freshDrumsIfEmpty();
 
 })();
