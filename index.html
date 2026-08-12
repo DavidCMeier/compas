@@ -89,7 +89,7 @@
 
     <section class="panel">
       <h2>Círculo de quintas</h2>
-      <p class="hint">Anillo exterior: mayores · interior: relativas menores. Las vecinas de tu tonalidad son las modulaciones más suaves.</p>
+      <p class="hint">Anillo exterior: mayores · interior: relativas menores. Se iluminan los 7 acordes de tu tonalidad (el ° es el semidisminuido); las vecinas son las modulaciones más suaves.</p>
       <div id="circleFifths" class="circle-wrap"></div>
     </section>
 
@@ -116,6 +116,26 @@
       </div>
       <div id="chordGrid" class="chord-grid"></div>
       <p class="hint">Clic = escuchar · <b>＋</b> = insertar en el paso marcado de la pista activa.</p>
+      <button id="btnNewChord" class="mini">＋ Crear acorde propio</button>
+      <div id="chordBuilder" class="chord-builder hidden">
+        <div class="row gap">
+          <div class="thgroup">
+            <label class="tiny-label">FUNDAMENTAL</label>
+            <select id="cbRoot"></select>
+          </div>
+          <div class="thgroup">
+            <label class="tiny-label">NOMBRE</label>
+            <input id="cbName" type="text" placeholder="p. ej. Cadd9" maxlength="16">
+          </div>
+        </div>
+        <p class="hint">Elige los intervalos (hasta dos octavas: 9ª, 10ª, 11ª, 13ª…):</p>
+        <div id="cbIntervals" class="cb-intervals"></div>
+        <div class="row gap">
+          <button id="cbPreview" class="mini">▶ Escuchar</button>
+          <button id="cbSave" class="btn-secondary">Guardar acorde</button>
+          <button id="cbCancel" class="mini">Cancelar</button>
+        </div>
+      </div>
     </section>
 
     <section class="panel">

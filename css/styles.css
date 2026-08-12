@@ -203,6 +203,32 @@ input[type=range]{ accent-color:var(--amber); width:90px; }
 }
 .chord-chip .cadd:hover{ color:var(--amber); background:rgba(245,167,66,.08); }
 
+/* ---------- creador de acordes propios ---------- */
+
+.chord-builder{
+  margin-top:12px; padding:14px;
+  background:var(--bg2); border:1px dashed var(--amber-dim); border-radius:10px;
+  display:flex; flex-direction:column; gap:12px;
+}
+.chord-builder input[type=text]{
+  background:var(--panel); border:1px solid var(--line); border-radius:8px;
+  padding:7px 10px; font-size:13px; width:130px;
+}
+.cb-intervals{ display:flex; flex-wrap:wrap; gap:4px; }
+.int-btn{
+  min-width:34px; padding:7px 4px; border-radius:7px;
+  border:1px solid var(--line); background:var(--panel);
+  color:var(--muted); font-family:var(--font-mono); font-size:10.5px;
+  transition:all .12s;
+}
+.int-btn:hover:not(:disabled){ border-color:var(--amber-dim); }
+.int-btn.active{ background:var(--amber); color:var(--bg); border-color:var(--amber); }
+.int-btn.octave-mark{ margin-left:10px; }
+.int-btn:disabled{ cursor:default; opacity:.9; }
+.chord-chip.custom{ border-color:var(--amber-dim); }
+.chord-chip .cdel{ font-size:11px; }
+.chord-chip .cdel:hover{ color:var(--coral); background:rgba(239,111,78,.1); }
+
 /* ---------- progresiones sugeridas ---------- */
 
 .prog-suggestions{ display:flex; flex-direction:column; gap:6px; }
@@ -383,6 +409,7 @@ input[type=range]{ accent-color:var(--amber); width:90px; }
 .cf-seg.active{ fill:var(--amber); }
 .cf-seg.active-minor{ fill:var(--teal); }
 .cf-seg.near{ fill:rgba(245,167,66,.16); }
+.cf-seg.dim7th{ fill:rgba(86,179,165,.22); stroke:var(--teal); stroke-dasharray:3 2; }
 .cf-label{
   font-family:var(--font-mono); font-size:11px; fill:var(--text);
   text-anchor:middle; dominant-baseline:middle; pointer-events:none;

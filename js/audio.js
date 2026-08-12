@@ -41,9 +41,9 @@ const AudioEngine = (() => {
     { id:'eguitar',    name:'Guitarra eléctrica', gm:27,  engine:'pluck', p:{ damp:.3, bright:.5, gain:.9, drive:0 } },
     { id:'dguitar',    name:'Guitarra distorsión',gm:30,  engine:'pluck', p:{ damp:.25, bright:.6, gain:.7, drive:14 } },
     { id:'nylon',      name:'Guitarra española',  gm:24,  engine:'pluck', p:{ damp:.55, bright:.45, gain:.95 } },
-    { id:'bass',       name:'Bajo eléctrico',     gm:33,  engine:'pluck', p:{ damp:.6, bright:.35, gain:1.1 } },
-    { id:'synthbass',  name:'Bajo sintetizado',   gm:38,  engine:'sub',   p:{ oscs:[['sawtooth',0,.8],['square',-12,.5]], attack:.005, decay:.25, sustain:.6, release:.12, cutoff:900, cutEnv:1200, gain:.55 } },
-    { id:'contrabass', name:'Contrabajo',         gm:43,  engine:'sub',   p:{ oscs:[['sawtooth',0,.7],['sine',0,.5]], attack:.06, decay:.2, sustain:.75, release:.2, cutoff:700, gain:.55 } },
+    { id:'bass',       name:'Bajo eléctrico',     gm:33,  oct:-12, engine:'pluck', p:{ damp:.65, bright:.25, gain:1.2 } },
+    { id:'synthbass',  name:'Bajo sintetizado',   gm:38,  oct:-12, engine:'sub',   p:{ oscs:[['sawtooth',0,.8],['square',-12,.5]], attack:.005, decay:.25, sustain:.6, release:.12, cutoff:900, cutEnv:1200, gain:.55 } },
+    { id:'contrabass', name:'Contrabajo',         gm:43,  oct:-12, engine:'sub',   p:{ oscs:[['sawtooth',0,.7],['sine',0,.5]], attack:.06, decay:.2, sustain:.75, release:.2, cutoff:700, gain:.55 } },
     { id:'violin',     name:'Violín',             gm:40,  engine:'sub',   p:{ oscs:[['sawtooth',0,.7],['sawtooth',.08,.7]], attack:.12, decay:.2, sustain:.8, release:.25, cutoff:3800, vib:5.5, vibAmt:6, gain:.35 } },
     { id:'cello',      name:'Violonchelo',        gm:42,  engine:'sub',   p:{ oscs:[['sawtooth',0,.8],['sawtooth',-.09,.7]], attack:.1, decay:.2, sustain:.85, release:.3, cutoff:2200, vib:5, vibAmt:5, gain:.45 } },
     { id:'strings',    name:'Cuerdas (ensemble)', gm:48,  engine:'sub',   p:{ oscs:[['sawtooth',0,.6],['sawtooth',.15,.6],['sawtooth',-.15,.6]], attack:.3, decay:.3, sustain:.85, release:.6, cutoff:3200, gain:.3 } },
@@ -322,6 +322,7 @@ const AudioEngine = (() => {
     const t = when ?? ctx.currentTime;
     const dest = trackId != null ? trackGain(trackId, volume) : master;
     const inst = preset(instrumentId);
+    midi += inst.oct ?? 0; // instrumentos graves suenan una octava abajo
     vel = vel ?? .9;
     try {
       switch(inst.engine){

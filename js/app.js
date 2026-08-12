@@ -59,6 +59,7 @@ function defaultState(){
     sections: [sec],
     arrangement: [sec.id],
     recordings: [],
+    customChords: [],   // [{id, name, root (pc), intervals: [semitonos]}]
     lyrics: '',
   };
 }
@@ -213,6 +214,9 @@ function renderCircle(){
     return t;
   };
 
+  // el vii° de la tonalidad vive en el anillo interior, dos posiciones a la derecha
+  const dimIdx = activeIdx >= 0 ? (activeIdx + 2) % 12 : -1;
+
   FIFTHS.forEach((f, i) => {
     const near = activeIdx >= 0 && (i === (activeIdx + 1) % 12 || i === (activeIdx + 11) % 12);
     // exterior: mayor
@@ -228,19 +232,21 @@ function renderCircle(){
     svg.appendChild(wOut);
     svg.appendChild(label(91, i, f, false));
 
-    // interior: relativa menor
+    // interior: relativa menor (o el vii° de la tonalidad activa)
     const minorRoot = Theory.ROOTS[(Theory.rootIndex(f) + 9) % 12];
+    const isDim = i === dimIdx;
     const wIn = wedge(72, 40, i);
     wIn.setAttribute('class', 'cf-seg'
       + (i === activeIdx && isMinor ? ' active-minor' : '')
-      + (near || (i === activeIdx && !isMinor) ? ' near' : ''));
+      + (near || (i === activeIdx && !isMinor) ? ' near' : '')
+      + (isDim ? ' dim7th' : ''));
     wIn.addEventListener('click', () => {
       state.key = minorRoot;
       state.scaleId = 'minor';
       onTheoryChange();
     });
     svg.appendChild(wIn);
-    svg.appendChild(label(56, i, minorRoot + 'm', true));
+    svg.appendChild(label(56, i, minorRoot + (isDim ? '°' : 'm'), true));
   });
 
   wrap.appendChild(svg);
@@ -306,10 +312,22 @@ let chordPalette = [];
 
 function renderChords(){
   chordPalette = Theory.chordsFor(state.key, state.scaleId, state.customOffsets, state.seventh);
+  // acordes propios del usuario, siempre visibles
+  for (const cc of state.customChords){
+    chordPalette.push({
+      degree: null,
+      roman: '✳',
+      name: cc.name,
+      rootPc: cc.root,
+      midiNotes: cc.intervals.map(i => 60 + cc.root + i),
+      custom: true,
+      id: cc.id,
+    });
+  }
   const g = $('#chordGrid');
   g.innerHTML = '';
   for (const ch of chordPalette){
-    const chip = el('div', 'chord-chip');
+    const chip = el('div', 'chord-chip' + (ch.custom ? ' custom' : ''));
     const main = el('button', 'cmain');
     main.appendChild(el('span', 'cname', ch.name));
     if (ch.roman) main.appendChild(el('span', 'croman', ch.roman));
@@ -320,10 +338,73 @@ function renderChords(){
     add.onclick = () => insertChord(ch);
     chip.appendChild(main);
     chip.appendChild(add);
+    if (ch.custom){
+      const del = el('button', 'cadd cdel', '✕');
+      del.title = 'Eliminar este acorde propio';
+      del.onclick = () => {
+        if (!confirm(`¿Eliminar el acorde «${ch.name}»?`)) return;
+        state.customChords = state.customChords.filter(c => c.id !== ch.id);
+        renderChords(); renderProgLane(); save();
+      };
+      chip.appendChild(del);
+    }
     g.appendChild(chip);
   }
   $('#btnTriads').classList.toggle('active', !state.seventh);
   $('#btnSevenths').classList.toggle('active', state.seventh);
+}
+
+/* ---- creador de acordes propios ---- */
+
+const INTERVAL_LABELS = ['1','♭2','2','♭3','3','4','♭5','5','♯5','6','♭7','7',
+                         '8','♭9','9','♯9','10','11','♯11','12','♭13','13','♭14','14','15'];
+let cbSelected = new Set([0, 4, 7]);
+
+function renderChordBuilder(){
+  const rootSel = $('#cbRoot');
+  if (!rootSel.options.length){
+    for (const r of Theory.ROOTS){
+      const o = el('option', '', r); o.value = r; rootSel.appendChild(o);
+    }
+  }
+  rootSel.value = Theory.ROOTS.includes(state.key) ? state.key : 'C';
+  const grid = $('#cbIntervals');
+  grid.innerHTML = '';
+  INTERVAL_LABELS.forEach((lbl, semis) => {
+    const b = el('button', 'int-btn' + (cbSelected.has(semis) ? ' active' : ''), lbl);
+    if (semis === 0){ b.disabled = true; b.classList.add('active'); }
+    else b.onclick = () => {
+      if (cbSelected.has(semis)) cbSelected.delete(semis);
+      else cbSelected.add(semis);
+      b.classList.toggle('active');
+    };
+    if (semis === 12) b.classList.add('octave-mark');
+    grid.appendChild(b);
+  });
+}
+
+function builderMidis(){
+  const rootPc = Theory.rootIndex($('#cbRoot').value);
+  return [...cbSelected].sort((a,b)=>a-b).map(i => 60 + rootPc + i);
+}
+
+function saveCustomChord(){
+  if (cbSelected.size < 2){ toast('Elige al menos un intervalo además de la fundamental.'); return; }
+  const root = $('#cbRoot').value;
+  let name = $('#cbName').value.trim() || (root + ' pers.');
+  const used = new Set([...chordPalette.map(c => c.name)]);
+  let final = name, n = 2;
+  while (used.has(final)) final = name + ' (' + n++ + ')';
+  state.customChords.push({
+    id: uid(),
+    name: final,
+    root: Theory.rootIndex(root),
+    intervals: [...cbSelected].sort((a,b)=>a-b),
+  });
+  $('#chordBuilder').classList.add('hidden');
+  $('#cbName').value = '';
+  renderChords(); renderProgLane(); save();
+  toast('Acorde «' + final + '» guardado. Lo tienes en la paleta y en las progresiones.');
 }
 
 function insertChord(ch){
@@ -626,9 +707,10 @@ function renderRoll(){
     const c = el('div', 'ruler-cell');
     if (s % spbar === 0) { c.classList.add('bar-start'); c.textContent = (s / spbar + 1); }
     else if (s % spb === 0) c.textContent = '·';
-    if (s === insertCursor && !isDrumsActive()) c.classList.add('cursor');
+    if (s === insertCursor) c.classList.add('cursor');
     c.style.width = CELL() + 'px';
-    c.onclick = () => { insertCursor = s; renderRoll(); };
+    c.title = 'Situar aquí el cursor (inserción e inicio de reproducción)';
+    c.onclick = () => setPlayPosition(s);
     ruler.appendChild(c);
   }
   roll.appendChild(ruler);
@@ -853,6 +935,23 @@ let playheadRef = { startTime: 0, startStep: 0 };
 let playMap = [];
 let playSteps = 0;
 let lastArrIdx = -1;
+let pendingJump = null; // paso local (sección activa) donde empezar al dar a ▶
+
+// Sitúa el cursor: marca el paso de inserción y mueve el punto de reproducción.
+function setPlayPosition(s){
+  insertCursor = s;
+  if (playing){
+    const seg = playMap.find(g => g.sec.id === activeSectionId);
+    if (seg){
+      currentStep = seg.start + Math.min(s, seg.steps - 1);
+      nextNoteTime = AudioEngine.now() + 0.05;
+      playheadRef = { startTime: nextNoteTime, startStep: currentStep };
+    }
+  } else {
+    pendingJump = s;
+  }
+  renderRoll();
+}
 
 function buildPlayMap(){
   let secs;
@@ -887,6 +986,11 @@ function togglePlay(){
 function play(){
   AudioEngine.ensure();
   buildPlayMap();
+  if (pendingJump !== null){
+    const seg = playMap.find(g => g.sec.id === activeSectionId);
+    if (seg) currentStep = seg.start + Math.min(pendingJump, seg.steps - 1);
+    pendingJump = null;
+  }
   currentStep = currentStep % playSteps;
   playing = true;
   $('#btnPlay').classList.add('playing');
@@ -909,6 +1013,7 @@ function pause(){
 function stop(){
   pause();
   currentStep = 0;
+  pendingJump = null;
 }
 
 function scheduler(){
@@ -1159,11 +1264,14 @@ function exportMidi(){
     tempo: state.tempo,
     timeSig: state.timeSig,
     stepsPerBeat: stepsPerBeat(),
-    tracks: state.tracks.map(tr => ({
-      name: tr.name,
-      gm: AudioEngine.preset(tr.instrument).gm,
-      notes: flat.trackNotes.get(tr.id) ?? [],
-    })),
+    tracks: state.tracks.map(tr => {
+      const oct = AudioEngine.preset(tr.instrument).oct ?? 0;
+      return {
+        name: tr.name,
+        gm: AudioEngine.preset(tr.instrument).gm,
+        notes: (flat.trackNotes.get(tr.id) ?? []).map(n => ({ ...n, midi: n.midi + oct })),
+      };
+    }),
     drums: Object.values(flat.drumSteps).some(a=>a.length) ? { steps: flat.drumSteps } : null,
   };
   const bytes = Midi.write(song);
@@ -1325,6 +1433,9 @@ function transpose(semis){
       if (ch) ch.midiNotes = ch.midiNotes.map(m => m + semis);
     }
   }
+  for (const cc of state.customChords){
+    cc.root = (cc.root + semis + 12) % 12;
+  }
   onTheoryChange();
   toast('Canción transpuesta a ' + state.key + '.');
 }
@@ -1393,6 +1504,18 @@ function bindControls(){
   $('#scaleSel').onchange = e => { state.scaleId = e.target.value; onTheoryChange(); };
   $('#btnTriads').onclick = () => { state.seventh = false; renderChords(); renderProgLane(); save(); };
   $('#btnSevenths').onclick = () => { state.seventh = true; renderChords(); renderProgLane(); save(); };
+
+  $('#btnNewChord').onclick = () => {
+    const box = $('#chordBuilder');
+    box.classList.toggle('hidden');
+    if (!box.classList.contains('hidden')){
+      cbSelected = new Set([0, 4, 7]);
+      renderChordBuilder();
+    }
+  };
+  $('#cbPreview').onclick = () => AudioEngine.playChord(activeTrack()?.instrument ?? 'piano', builderMidis(), 1.4);
+  $('#cbSave').onclick = saveCustomChord;
+  $('#cbCancel').onclick = () => $('#chordBuilder').classList.add('hidden');
 
   $('#songTitle').onchange = e => { state.title = e.target.value || 'Mi canción'; save(); };
 
