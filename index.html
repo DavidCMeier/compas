@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compás — estudio de composición</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=Martian+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎼</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <h1>COMPÁS</h1>
+    <span class="tagline">estudio de composición</span>
+  </div>
+
+  <div class="transport">
+    <button id="btnPlay" class="btn-play" title="Reproducir / pausar (espacio)">▶</button>
+    <button id="btnStop" class="btn-stop" title="Detener">■</button>
+
+    <div class="tgroup">
+      <label>Bucle</label>
+      <button id="btnPlayMode" class="mini mode-btn" title="Alternar entre repetir la sección activa o la canción completa">Sección</button>
+    </div>
+
+    <div class="tgroup">
+      <label>Tempo</label>
+      <div class="row">
+        <input type="number" id="tempo" min="30" max="260" value="100">
+        <button id="btnTap" class="mini" title="Marca el pulso pulsando varias veces">TAP</button>
+      </div>
+    </div>
+
+    <div class="tgroup">
+      <label>Compás</label>
+      <select id="timeSig">
+        <option value="4/4" selected>4/4</option>
+        <option value="3/4">3/4</option>
+        <option value="2/4">2/4</option>
+        <option value="5/4">5/4</option>
+        <option value="7/4">7/4</option>
+        <option value="6/8">6/8</option>
+        <option value="7/8">7/8</option>
+        <option value="9/8">9/8</option>
+        <option value="12/8">12/8</option>
+      </select>
+    </div>
+
+    <div class="tgroup">
+      <label>Compases (sección)</label>
+      <input type="number" id="bars" min="1" max="64" value="4">
+    </div>
+
+    <div class="tgroup">
+      <label>Swing</label>
+      <input type="range" id="swing" min="0" max="60" value="0">
+    </div>
+
+    <div class="tgroup">
+      <label>Humanizar</label>
+      <input type="range" id="humanize" min="0" max="100" value="0" title="Pequeñas variaciones de tiempo y volumen para que suene menos robótico">
+    </div>
+
+    <div class="tgroup">
+      <label>Metrónomo</label>
+      <button id="btnMetro" class="toggle" title="Activar metrónomo">✦</button>
+    </div>
+
+    <div class="tgroup">
+      <label>Volumen</label>
+      <input type="range" id="masterVol" min="0" max="100" value="85">
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ==================== PANEL DE TEORÍA ==================== -->
+  <aside class="side">
+
+    <section class="panel">
+      <h2>Tonalidad</h2>
+      <div class="root-grid" id="rootGrid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Círculo de quintas</h2>
+      <p class="hint">Anillo exterior: mayores · interior: relativas menores. Las vecinas de tu tonalidad son las modulaciones más suaves.</p>
+      <div id="circleFifths" class="circle-wrap"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Escala / modo</h2>
+      <select id="scaleSel"></select>
+      <div id="customScale" class="custom-scale hidden">
+        <p class="hint">Ajusta cada grado con ♭, ♮ o ♯ (sobre la escala mayor):</p>
+        <div id="degreeGrid" class="degree-grid"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>La escala <span class="x2">× 2 octavas</span></h2>
+      <p class="hint">Pulsa para escuchar cada nota. Útil para construir acordes mezclando bajo y guitarra.</p>
+      <div id="scaleStrip" class="scale-strip"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Acordes de la tonalidad</h2>
+      <div class="seg" role="tablist">
+        <button id="btnTriads" class="seg-btn active">Tríadas</button>
+        <button id="btnSevenths" class="seg-btn">Séptimas</button>
+      </div>
+      <div id="chordGrid" class="chord-grid"></div>
+      <p class="hint">Clic = escuchar · <b>＋</b> = insertar en el paso marcado de la pista activa.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Progresiones sugeridas</h2>
+      <div id="progSuggestions" class="prog-suggestions"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Ideas de voz <span class="x2">micrófono</span></h2>
+      <p class="hint">Graba un tarareo o una frase para no perder la idea. Se guarda con el proyecto.</p>
+      <button id="btnRec" class="btn-secondary">● Grabar</button>
+      <div id="recList" class="rec-list"></div>
+    </section>
+
+  </aside>
+
+  <!-- ==================== ÁREA DE TRABAJO ==================== -->
+  <section class="workspace">
+
+    <div class="song-title-row">
+      <input id="songTitle" class="song-title" value="Mi canción" spellcheck="false">
+      <div class="song-actions">
+        <button id="btnTransDown" class="mini" title="Transponer toda la canción un semitono abajo">−1</button>
+        <span class="mini-label">transponer</span>
+        <button id="btnTransUp" class="mini" title="Transponer toda la canción un semitono arriba">+1</button>
+      </div>
+    </div>
+
+    <!-- secciones -->
+    <div class="sectionsbar">
+      <span class="bar-label">SECCIONES</span>
+      <div id="sectionTabs" class="section-tabs"></div>
+      <button id="btnAddSection" class="btn-add">＋ Sección</button>
+    </div>
+
+    <!-- estructura de la canción -->
+    <section class="panel arrange-panel">
+      <h2>Estructura de la canción <span class="x2">orden de reproducción</span></h2>
+      <div id="arrangement" class="arrangement"></div>
+      <div id="arrangeAdders" class="arrange-adders"></div>
+    </section>
+
+    <!-- pestañas de pistas -->
+    <div class="tracksbar">
+      <span class="bar-label">LÍNEAS</span>
+      <div id="trackTabs" class="track-tabs"></div>
+      <button id="btnAddTrack" class="btn-add">＋ Línea</button>
+    </div>
+
+    <!-- cabecera de la pista activa -->
+    <div id="trackHead" class="track-head"></div>
+
+    <!-- rollo de piano / editor de batería -->
+    <div id="rollWrap" class="roll-wrap">
+      <div id="roll" class="roll"></div>
+    </div>
+
+    <!-- progresión de acordes por compás -->
+    <section class="panel prog-panel">
+      <h2>Progresión por compás <span class="x2">de la sección activa</span></h2>
+      <div id="progLane" class="prog-lane"></div>
+      <div class="row gap">
+        <div class="thgroup">
+          <label class="tiny-label">CÓMO ESCRIBIRLA</label>
+          <select id="arpMode">
+            <option value="block">Acordes en bloque</option>
+            <option value="up">Arpegio ascendente</option>
+            <option value="down">Arpegio descendente</option>
+            <option value="updown">Arpegio arriba y abajo</option>
+            <option value="pattern">Patrón 1·5·3·5</option>
+          </select>
+        </div>
+        <button id="btnApplyProg" class="btn-secondary">Escribir en la pista activa</button>
+        <button id="btnClearProg" class="mini">Vaciar</button>
+      </div>
+    </section>
+
+    <!-- letras -->
+    <section class="panel">
+      <h2>Letra <span class="x2">sílabas y rimas</span> <button id="btnLyrics" class="mini">mostrar / ocultar</button></h2>
+      <div id="lyricsBox" class="lyrics-box hidden">
+        <textarea id="lyrics" class="lyrics" rows="10" placeholder="Escribe aquí la letra de tu canción…&#10;Verás las sílabas de cada verso y las rimas detectadas."></textarea>
+        <div id="lyricsAnalysis" class="lyrics-analysis"></div>
+      </div>
+    </section>
+
+  </section>
+</main>
+
+<footer class="bottombar">
+  <div class="io">
+    <button id="btnExportJson" class="btn-secondary">⬇ Guardar proyecto (.compas.json)</button>
+    <button id="btnExportMidi" class="btn-secondary">⬇ Exportar MIDI (.mid)</button>
+    <button id="btnExportWav" class="btn-secondary">⬇ Exportar audio (.wav)</button>
+    <button id="btnImport" class="btn-secondary">⬆ Importar (.json / .mid)</button>
+    <input type="file" id="fileInput" accept=".json,.mid,.midi" hidden>
+  </div>
+  <span class="autosave" id="autosaveMsg">Todo se guarda automáticamente en este dispositivo.</span>
+</footer>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/theory.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/drums.js"></script>
+<script src="js/midi.js"></script>
+<script src="js/lyrics.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
